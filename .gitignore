@@ -1,0 +1,26 @@
+# Local state and generated artifacts
+state/
+.tmp/
+artifacts/
+*.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+farcaster-credentials.json
+auth-profiles.json
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
