@@ -185,7 +185,8 @@ HIGH_RISK_ACTION_WORDS = [
 ]
 
 SECRET_PATTERNS = [
-    re.compile(r"\b(?:api[_-]?key|secret|token|signer|mnemonic|private[_-]?key)\b", re.I),
+    re.compile(r"\b(?:api[_-]?key|secret|token|mnemonic|private[_-]?key)\b", re.I),
+    re.compile(r"\bsigner[_-]?(?:key|secret|token)\b", re.I),
     re.compile(r"\bNEYNAR_API_KEY\b", re.I),
     re.compile(r"\b[A-Za-z0-9_\-]*sk-[A-Za-z0-9_\-]{12,}\b"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
@@ -3311,7 +3312,11 @@ def precheck_draft(
 
     text = draft.get("text", "")
     source_text = event.get("cast", {}).get("text", "")
-    combined = "\n".join([text, source_text, str(event.get("raw_ref") or "")])
+    # raw_ref often contains Farcaster cast hashes, which share the same
+    # 0x40-hex shape as wallet addresses. Keep wallet/secret scanning on
+    # public text only; private-runtime checks below still inspect raw_ref.
+    public_combined = "\n".join([text, source_text])
+    private_ref_combined = "\n".join([text, source_text, str(event.get("raw_ref") or "")])
 
     if not text.strip():
         block_reasons.append("draft_empty")
@@ -3323,11 +3328,11 @@ def precheck_draft(
         block_reasons.append("decision_has_block_reasons")
 
     for pattern in SECRET_PATTERNS:
-        if pattern.search(combined):
+        if pattern.search(public_combined):
             block_reasons.append("secret_or_wallet_pattern_detected")
             break
     for pattern in PRIVATE_MEMORY_PATTERNS:
-        if pattern.search(combined):
+        if pattern.search(private_ref_combined):
             block_reasons.append("private_or_old_runtime_context_detected")
             break
     for pattern in PRIVATE_EXPRESSION_MARKER_PATTERNS:

@@ -856,6 +856,17 @@ class MisaFarcasterAutonomousOperatorTests(unittest.TestCase):
         self.assertFalse(result["publish_packet"]["validated"])
         self.assertEqual(len(self.jsonl_records("publish-queue.jsonl")), 0)
 
+    def test_public_x402_signer_discussion_is_not_treated_as_secret(self):
+        event = self.event(
+            event_id="evt_public_signer_discussion",
+            text="Misa, explain x402 audit receipts and webhook rollback gates without using a private signer.",
+            topic_tags=["farcaster", "x402", "security"],
+            metrics={"heat": 0.88, "likes": 18, "replies": 6, "recasts": 2},
+        )
+        result = autonomy.run_event_dry_run(event, state_root=self.state_root)
+        self.assertTrue(result["publish_packet"]["validated"], result["publish_packet"]["block_reasons"])
+        self.assertNotIn("secret_or_wallet_pattern_detected", result["precheck"]["block_reasons"])
+
     def test_record_outcome_writes_operator_learning(self):
         result = autonomy.run_event_dry_run(self.event(event_id="evt_outcome"), state_root=self.state_root)
         outcome = autonomy.record_outcome(
@@ -1143,6 +1154,14 @@ class MisaFarcasterAutonomousOperatorTests(unittest.TestCase):
         self.assertTrue(result["operator_ran"])
         self.assertEqual(result["event"]["event_type"], "mention")
         self.assertEqual(result["operator_result"]["decision"]["action"], "reply")
+        self.assertTrue(
+            result["operator_result"]["publish_packet"]["validated"],
+            result["operator_result"]["publish_packet"]["block_reasons"],
+        )
+        self.assertNotIn(
+            "secret_or_wallet_pattern_detected",
+            result["operator_result"]["precheck"]["block_reasons"],
+        )
         self.assertFalse(result["operator_result"]["publish_packet"]["submitted"])
         self.assertEqual(result["side_effects"]["publisher"], "not_called")
 
@@ -1292,6 +1311,9 @@ class MisaFarcasterAutonomousOperatorTests(unittest.TestCase):
         self.assertGreaterEqual(result["pre_publish_closure"]["publish_packets_seen"], 1)
         self.assertEqual(result["pre_publish_closure"]["approved_for_external_publisher"], 0)
         self.assertTrue(result["pre_publish_closure"]["rollback_required"])
+        self.assertTrue(
+            all("packet_not_validated" not in audit["decision"]["block_reasons"] for audit in result["send_audits"])
+        )
         self.assertTrue(
             all("publisher_disabled" in audit["decision"]["block_reasons"] for audit in result["send_audits"])
         )
